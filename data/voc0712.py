@@ -16,6 +16,10 @@ if sys.version_info[0] == 2:
     import xml.etree.cElementTree as ET
 else:
     import xml.etree.ElementTree as ET
+import simplejson as json
+import os.path as op
+
+sys.path.append(op.expanduser('~/code/quickdetection/scripts'))
 
 VOC_CLASSES = (  # always index 0
     'aeroplane', 'bicycle', 'bird', 'boat',
@@ -25,7 +29,8 @@ VOC_CLASSES = (  # always index 0
     'sheep', 'sofa', 'train', 'tvmonitor')
 
 # note: if you used our download scripts, this should be right
-VOC_ROOT = osp.join(HOME, "data/VOCdevkit/")
+#VOC_ROOT = osp.join(HOME, "data/VOCdevkit/")
+VOC_ROOT = "data/VOCdevkit/"
 
 
 class VOCAnnotationTransform(object):
@@ -76,24 +81,7 @@ class VOCAnnotationTransform(object):
 
         return res  # [[xmin, ymin, xmax, ymax, label_ind], ... ]
 
-
 class VOCDetection(data.Dataset):
-    """VOC Detection Dataset Object
-
-    input is image, target is annotation
-
-    Arguments:
-        root (string): filepath to VOCdevkit folder.
-        image_set (string): imageset to use (eg. 'train', 'val', 'test')
-        transform (callable, optional): transformation to perform on the
-            input image
-        target_transform (callable, optional): transformation to perform on the
-            target `annotation`
-            (eg: take in caption string, return tensor of word indices)
-        dataset_name (string, optional): which dataset to load
-            (default: 'VOC2007')
-    """
-
     def __init__(self, root,
                  image_sets=[('2007', 'trainval'), ('2012', 'trainval')],
                  transform=None, target_transform=VOCAnnotationTransform(),
@@ -182,3 +170,47 @@ class VOCDetection(data.Dataset):
             tensorized version of img, squeezed
         '''
         return torch.Tensor(self.pull_image(index)).unsqueeze_(0)
+
+class TSVDetection(data.Dataset):
+    def __init__(self, tsv_file, labelmap, transform=None):
+        from tsv_io import TSVFile
+        from qd_common import load_list_file
+        self._tsv = TSVFile(tsv_file)
+        self._label_to_idx = {l: i for i, l in
+                enumerate(load_list_file(labelmap))}
+        self.transform = transform
+
+    def __getitem__(self, index):
+        im, gt, h, w = self.pull_item(index)
+
+        return im, gt
+
+    def __len__(self):
+        return self._tsv.num_rows()
+
+    def pull_item(self, index):
+        from qd_common import img_from_base64
+        key, label_str, img_str = self._tsv.seek(index)
+
+        img = img_from_base64(img_str)
+        height, width, channels = img.shape
+
+        rects = json.loads(label_str)
+        rects = [r for r in rects if 'diff' not in r or not r['diff']]
+        for r_info in rects:
+            r = r_info['rect']
+            r[0], r[2] = r[0] / width, r[2] / width
+            r[1], r[3] = r[1] / height, r[3] / height
+            idx = self._label_to_idx[r_info['class']]
+            r.append(idx)
+        target = [r['rect'] for r in rects]
+
+        if self.transform is not None:
+            target = np.array(target)
+            img, boxes, labels = self.transform(img, target[:, :4], target[:, 4])
+            # to rgb
+            img = img[:, :, (2, 1, 0)]
+            # img = img.transpose(2, 0, 1)
+            target = np.hstack((boxes, np.expand_dims(labels, axis=1)))
+        return torch.from_numpy(img).permute(2, 0, 1), target, height, width
+
