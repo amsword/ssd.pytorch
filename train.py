@@ -67,8 +67,14 @@ else:
 if not os.path.exists(args.save_folder):
     os.mkdir(args.save_folder)
 
-
 def train():
+    train_data = 'voc20'
+    train_split = 'train'
+    from process_tsv import TSVDataset
+    tsv_dataset = TSVDataset(train_data)
+    tsv_file = tsv_dataset.get_data(train_split)
+    labelmap = tsv_dataset.get_labelmap_file()
+
     if args.dataset == 'COCO':
         if args.dataset_root == VOC_ROOT:
             if not os.path.exists(COCO_ROOT):
@@ -84,11 +90,13 @@ def train():
         if args.dataset_root == COCO_ROOT:
             parser.error('Must specify dataset if specifying dataset_root')
         cfg = voc
-        #dataset = VOCDetection(root=args.dataset_root,
-                               #transform=SSDAugmentation(cfg['min_dim'],
-                                                         #MEANS))
-        dataset = TSVDetection(tsv_file='/home/jianfw/code/quickdetection/data/voc20/train.tsv',
-                labelmap='/home/jianfw/code/quickdetection/data/voc20/labelmap.txt',
+        dataset = VOCDetection(root=args.dataset_root,
+                               transform=SSDAugmentation(cfg['min_dim'],
+                                                         MEANS))
+    elif args.dataset:
+        cfg = voc
+        dataset = TSVDetection(tsv_file=tsv_file,
+                labelmap=labelmap,
                 transform=SSDAugmentation(cfg['min_dim'], MEANS))
 
     ssd_net = build_ssd('train', cfg['min_dim'], cfg['num_classes'])
