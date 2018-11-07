@@ -194,7 +194,7 @@ def train(**kwargs):
             logging.info('timer: %.4f sec.' % (time.time() - t0))
             logging.info('iter ' + repr(iteration) + ' || Loss: %.4f ||' % (loss.data[0]))
 
-        if iteration != 0 and iteration % 5000 == 0:
+        if iteration != 0 and iteration % 500 == 0:
             logging.info('Saving state, iter:', iteration)
             torch.save(ssd_net.state_dict(), 'weights/ssd300_COCO_' +
                        repr(iteration) + '.pth')
@@ -232,5 +232,4 @@ if __name__ == '__main__':
     init_logging()
     args = parse_args()
     kwargs = vars(args)
-    import ipdb;ipdb.set_trace(context=15)
     train(**kwargs)
