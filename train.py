@@ -90,15 +90,15 @@ def train(**kwargs):
         dataset = COCODetection(root=cfg['dataset_root'],
                                 transform=SSDAugmentation(cfg['min_dim'],
                                                           MEANS))
-    elif cfg['dataset'] == 'VOC':
-        if cfg['dataset_root'] == COCO_ROOT:
-            parser.error('Must specify dataset if specifying dataset_root')
-        for k in voc:
-            assert k not in cfg
-            cfg[k] = voc[k]
-        dataset = VOCDetection(root=cfg['dataset_root'],
-                               transform=SSDAugmentation(cfg['min_dim'],
-                                                         MEANS))
+    #elif cfg['dataset'] == 'VOC':
+        #if cfg['dataset_root'] == COCO_ROOT:
+            #parser.error('Must specify dataset if specifying dataset_root')
+        #for k in voc:
+            #assert k not in cfg
+            #cfg[k] = voc[k]
+        #dataset = VOCDetection(root=cfg['dataset_root'],
+                               #transform=SSDAugmentation(cfg['min_dim'],
+                                                         #MEANS))
     elif cfg['dataset']:
         for k in voc:
             assert k not in cfg
@@ -232,4 +232,5 @@ if __name__ == '__main__':
     init_logging()
     args = parse_args()
     kwargs = vars(args)
+    import ipdb;ipdb.set_trace(context=15)
     train(**kwargs)
