@@ -98,36 +98,51 @@ def train():
         dataset = TSVDetection(tsv_file=tsv_file,
                 labelmap=labelmap,
                 transform=SSDAugmentation(cfg['min_dim'], MEANS))
+    # reduce the dependency on args. use cfg for everything
+    cfg['cuda'] = args.cuda
+    cfg['resume'] = args.resume
+    cfg['lr'] = args.lr
+    cfg['momentum'] = args.momentum
+    cfg['weight_decay'] = args.weight_decay
+    cfg['batch_size'] = args.batch_size
+    cfg['num_workers'] = args.num_workers
+    cfg['gamma'] = args.gamma
+    cfg['start_iter'] = args.start_iter
+    cfg['save_folder'] = args.save_folder
+    cfg['dataset'] = args.dataset
+
 
     ssd_net = build_ssd('train', cfg['min_dim'], cfg['num_classes'])
     net = ssd_net
 
-    if args.cuda:
+    if cfg['cuda']:
         net = torch.nn.DataParallel(ssd_net)
         cudnn.benchmark = True
 
-    if args.resume:
+    if cfg['resume']:
         print('Resuming training, loading {}...'.format(args.resume))
         ssd_net.load_weights(args.resume)
+        assert False, 'optimizer parameter is not loaded. Need a fix'
     else:
         vgg_weights = torch.load(args.save_folder + args.basenet)
         print('Loading base network...')
         ssd_net.vgg.load_state_dict(vgg_weights)
 
-    if args.cuda:
+    if cfg['cuda']:
         net = net.cuda()
 
-    if not args.resume:
+    if cfg['resume']:
         print('Initializing weights...')
         # initialize newly added layers' weights with xavier method
         ssd_net.extras.apply(weights_init)
         ssd_net.loc.apply(weights_init)
         ssd_net.conf.apply(weights_init)
 
-    optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum,
-                          weight_decay=args.weight_decay)
+    optimizer = optim.SGD(net.parameters(), lr=cfg['lr'],
+            momentum=cfg['momentum'],
+                          weight_decay=cfg['weight_decay'])
     criterion = MultiBoxLoss(cfg['num_classes'], 0.5, True, 0, True, 3, 0.5,
-                             False, args.cuda)
+                             False, cfg['cuda'])
 
     net.train()
     # loss counters
@@ -136,22 +151,20 @@ def train():
     epoch = 0
     logging.info('Loading the dataset...')
 
-    epoch_size = len(dataset) // args.batch_size
-    logging.info('Using the specified args:')
-    logging.info(args)
+    epoch_size = len(dataset) // cfg['batch_size']
 
     step_index = 0
 
-    data_loader = data.DataLoader(dataset, args.batch_size,
-                                  num_workers=args.num_workers,
+    data_loader = data.DataLoader(dataset, cfg['batch_size'],
+                                  num_workers=cfg['num_workers'],
                                   shuffle=True, collate_fn=detection_collate,
                                   pin_memory=True)
     # create batch iterator
     batch_iterator = iter(data_loader)
-    for iteration in range(args.start_iter, cfg['max_iter']):
+    for iteration in range(cfg['start_iter'], cfg['max_iter']):
         if iteration in cfg['lr_steps']:
             step_index += 1
-            adjust_learning_rate(optimizer, args.gamma, step_index)
+            adjust_learning_rate(optimizer, cfg['lr'], cfg['gamma'], step_index)
 
         t0 = time.time()
         # load train data
@@ -161,7 +174,7 @@ def train():
             batch_iterator = iter(data_loader)
             images, targets = next(batch_iterator)
 
-        if args.cuda:
+        if cfg['cuda']:
             images = Variable(images.cuda())
             targets = [Variable(ann.cuda(), volatile=True) for ann in targets]
         else:
@@ -190,16 +203,16 @@ def train():
             torch.save(ssd_net.state_dict(), 'weights/ssd300_COCO_' +
                        repr(iteration) + '.pth')
     torch.save(ssd_net.state_dict(),
-               args.save_folder + '' + args.dataset + '.pth')
+               cfg['save_folder'] + '' + cfg['dataset'] + '.pth')
 
 
-def adjust_learning_rate(optimizer, gamma, step):
+def adjust_learning_rate(optimizer, base_lr, gamma, step):
     """Sets the learning rate to the initial LR decayed by 10 at every
         specified step
     # Adapted from PyTorch Imagenet example:
     # https://github.com/pytorch/examples/blob/master/imagenet/main.py
     """
-    lr = args.lr * (gamma ** (step))
+    lr = base_lr * (gamma ** (step))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
