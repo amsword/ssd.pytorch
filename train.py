@@ -67,49 +67,44 @@ else:
 if not os.path.exists(args.save_folder):
     os.mkdir(args.save_folder)
 
-def train():
+def train(**kwargs):
     train_data = 'voc20'
     train_split = 'train'
     from process_tsv import TSVDataset
     tsv_dataset = TSVDataset(train_data)
     tsv_file = tsv_dataset.get_data(train_split)
     labelmap = tsv_dataset.get_labelmap_file()
-
-    if args.dataset == 'COCO':
-        if args.dataset_root == VOC_ROOT:
+    
+    cfg = kwargs
+    if cfg['dataset'] == 'COCO':
+        if cfg['dataset_root'] == VOC_ROOT:
             if not os.path.exists(COCO_ROOT):
                 parser.error('Must specify dataset_root if specifying dataset')
             print("WARNING: Using default COCO dataset_root because " +
                   "--dataset_root was not specified.")
-            args.dataset_root = COCO_ROOT
-        cfg = coco
-        dataset = COCODetection(root=args.dataset_root,
+            cfg['dataset_root'] = COCO_ROOT
+        for k in coco:
+            assert k not in cfg
+            cfg[k] = coco[k]
+        dataset = COCODetection(root=cfg['dataset_root'],
                                 transform=SSDAugmentation(cfg['min_dim'],
                                                           MEANS))
-    elif args.dataset == 'VOC':
-        if args.dataset_root == COCO_ROOT:
+    elif cfg['dataset'] == 'VOC':
+        if cfg['dataset_root'] == COCO_ROOT:
             parser.error('Must specify dataset if specifying dataset_root')
-        cfg = voc
-        dataset = VOCDetection(root=args.dataset_root,
+        for k in voc:
+            assert k not in cfg
+            cfg[k] = voc[k]
+        dataset = VOCDetection(root=cfg['dataset_root'],
                                transform=SSDAugmentation(cfg['min_dim'],
                                                          MEANS))
-    elif args.dataset:
-        cfg = voc
+    elif cfg['dataset']:
+        for k in voc:
+            assert k not in cfg
+            cfg[k] = voc[k]
         dataset = TSVDetection(tsv_file=tsv_file,
                 labelmap=labelmap,
                 transform=SSDAugmentation(cfg['min_dim'], MEANS))
-    # reduce the dependency on args. use cfg for everything
-    cfg['cuda'] = args.cuda
-    cfg['resume'] = args.resume
-    cfg['lr'] = args.lr
-    cfg['momentum'] = args.momentum
-    cfg['weight_decay'] = args.weight_decay
-    cfg['batch_size'] = args.batch_size
-    cfg['num_workers'] = args.num_workers
-    cfg['gamma'] = args.gamma
-    cfg['start_iter'] = args.start_iter
-    cfg['save_folder'] = args.save_folder
-    cfg['dataset'] = args.dataset
 
 
     ssd_net = build_ssd('train', cfg['min_dim'], cfg['num_classes'])
@@ -120,11 +115,11 @@ def train():
         cudnn.benchmark = True
 
     if cfg['resume']:
-        print('Resuming training, loading {}...'.format(args.resume))
-        ssd_net.load_weights(args.resume)
+        print('Resuming training, loading {}...'.format(cfg['resume']))
+        ssd_net.load_weights(cfg['resume'])
         assert False, 'optimizer parameter is not loaded. Need a fix'
     else:
-        vgg_weights = torch.load(args.save_folder + args.basenet)
+        vgg_weights = torch.load(cfg['save_folder'] + cfg['basenet'])
         print('Loading base network...')
         ssd_net.vgg.load_state_dict(vgg_weights)
 
@@ -234,4 +229,5 @@ def init_logging():
 
 if __name__ == '__main__':
     init_logging()
-    train()
+    kwargs = vars(args)
+    train(**kwargs)
