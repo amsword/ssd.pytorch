@@ -112,9 +112,9 @@ def ssd_pipeline(**kwargs):
     kwargs['save_folder'] = 'weights/'
     kwargs['lr'] = 1e-3
     kwargs['start_iter'] = 0
-    kwargs['num_workers'] = 0
+    kwargs['num_workers'] = 32
     kwargs['resume'] = True
-    kwargs['max_iter'] = 1
+    kwargs['max_iter'] = 120000
     kwargs['confidence_threshold'] = 0.01
     kwargs['force_train'] = True
     #kwargs['confidence_threshold'] = 0.7
