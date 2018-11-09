@@ -37,6 +37,7 @@ import cv2
 import os.path as op
 
 from tsv_io import TSVDataset, tsv_reader, tsv_writer
+from qd_pytorch import torch_save
 from tqdm import tqdm
 
 
@@ -269,10 +270,9 @@ class SSDTrain(TorchTrain):
                 logging.info('Saving state, iter: {}'.format(iteration))
                 model_file = op.join(self.output_folder, 'snapshot',
                         'model_iter_{}.pth.tar'.format(iteration + 1))
-                torch.save(ssd_net.state_dict(), model_file)
+                torch_save(ssd_net.state_dict(), model_file)
         model_file = op.join(self.output_folder, 'snapshot', 
                 'model_iter_{}.pth.tar'.format(iteration + 1))
-        from qd_pytorch import torch_save
         torch_save(ssd_net.state_dict(), model_file)
 
     def predict(self, model_file, predict_result_file):
