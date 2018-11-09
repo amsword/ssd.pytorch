@@ -172,18 +172,25 @@ class VOCDetection(data.Dataset):
         return torch.Tensor(self.pull_image(index)).unsqueeze_(0)
 
 class TSVDetection(data.Dataset):
-    def __init__(self, tsv_file, labelmap, transform=None):
+    def __init__(self, tsv_file, labelmap, 
+            transform=None):
         from tsv_io import TSVFile
         from qd_common import load_list_file
         self._tsv = TSVFile(tsv_file)
         self._label_to_idx = {l: i for i, l in
                 enumerate(load_list_file(labelmap))}
         self.transform = transform
+        self.ids = None
 
     def __getitem__(self, index):
-        im, gt, h, w = self.pull_item(index)
+        key, im, gt, h, w = self.pull_item(index)
 
         return im, gt
+
+    def get_ids(self):
+        if self.ids is None:
+            self.ids = [key for key, _, __ in self._tsv]
+        return self.ids
 
     def __len__(self):
         return self._tsv.num_rows()
@@ -212,5 +219,5 @@ class TSVDetection(data.Dataset):
             img = img[:, :, (2, 1, 0)]
             # img = img.transpose(2, 0, 1)
             target = np.hstack((boxes, np.expand_dims(labels, axis=1)))
-        return torch.from_numpy(img).permute(2, 0, 1), target, height, width
+        return key, torch.from_numpy(img).permute(2, 0, 1), target, height, width
 

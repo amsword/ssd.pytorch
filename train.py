@@ -16,6 +16,7 @@ import torch.utils.data as data
 import numpy as np
 import argparse
 import logging
+import os.path as op
 
 
 def str2bool(v):
@@ -31,8 +32,11 @@ def parse_args():
                         help='Dataset root directory path')
     parser.add_argument('--basenet', default='vgg16_reducedfc.pth',
                         help='Pretrained base model')
+    parser.add_argument('--expid', default='')
     parser.add_argument('--batch_size', default=32, type=int,
                         help='Batch size for training')
+    parser.add_argument('--max_iter', default=120000, type=int,
+                        )
     parser.add_argument('--resume', default=None, type=str,
                         help='Checkpoint state_dict file to resume training from')
     parser.add_argument('--start_iter', default=0, type=int,
@@ -75,6 +79,11 @@ def train(**kwargs):
     tsv_dataset = TSVDataset(train_data)
     tsv_file = tsv_dataset.get_data(train_split)
     labelmap = tsv_dataset.get_labelmap_file()
+    kwargs['output_folder'] = op.join('output', '_'.join([train_data, 'vgg',
+        kwargs['expid']]))
+    from qd_common import ensure_directory
+
+    ensure_directory(kwargs['output_folder'])
     
     cfg = kwargs
     if cfg['dataset'] == 'COCO':
@@ -101,7 +110,9 @@ def train(**kwargs):
                                                          #MEANS))
     elif cfg['dataset']:
         for k in voc:
-            assert k not in cfg
+            if k in cfg:
+                logging.info('skip {} to {}'.format(cfg[k], voc[k]))
+                continue
             cfg[k] = voc[k]
         dataset = TSVDetection(tsv_file=tsv_file,
                 labelmap=labelmap,
@@ -195,11 +206,14 @@ def train(**kwargs):
             logging.info('iter ' + repr(iteration) + ' || Loss: %.4f ||' % (loss.data[0]))
 
         if iteration != 0 and iteration % 500 == 0:
-            logging.info('Saving state, iter:', iteration)
-            torch.save(ssd_net.state_dict(), 'weights/ssd300_COCO_' +
-                       repr(iteration) + '.pth')
-    torch.save(ssd_net.state_dict(),
-               cfg['save_folder'] + '' + cfg['dataset'] + '.pth')
+            logging.info('Saving state, iter: {}'.format(iteration))
+            model_file = op.join(cfg['output_folder'], 'snapshot',
+                    'model_iter_{}.pth.tar'.format(iteration))
+            torch.save(ssd_net.state_dict(), op.join('snapshot',
+                    'model_iter_{}.pth.tar'.format(iteration)))
+    model_file = op.join(cfg['output_folder'], 'snapshot', 'model_iter_{}.pth.tar'.format(iteration))
+    torch.save(ssd_net.state_dict(), op.join('snapshot',
+            'model_iter_{}.pth.tar'.format(iteration)))
 
 
 def adjust_learning_rate(optimizer, base_lr, gamma, step):
