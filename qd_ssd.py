@@ -102,6 +102,7 @@ def test_net(pred_file, net, cuda, dataset, labelmap, thresh=0.05):
 
 def ssd_pipeline(**kwargs):
     kwargs['data'] = 'voc20'
+    kwargs['data'] = 'brand1048'
     kwargs['net'] = 'vgg'
     kwargs['expid'] = 'test'
     kwargs['force_evaluate'] = True
@@ -113,12 +114,12 @@ def ssd_pipeline(**kwargs):
     kwargs['save_folder'] = 'weights/'
     kwargs['lr'] = 1e-3
     kwargs['start_iter'] = 0
-    kwargs['num_workers'] = 32
     kwargs['resume'] = True
+    kwargs['batch_size'] = 32
+    kwargs['num_workers'] = 32
     kwargs['max_iter'] = 120000
     kwargs['confidence_threshold'] = 0.01
     kwargs['force_train'] = True
-    #kwargs['confidence_threshold'] = 0.7
     kwargs['cuda'] = True
 
     t = SSDTrain(**kwargs)
@@ -152,6 +153,8 @@ class SSDTrain(TorchTrain):
         super(SSDTrain, self).__init__(**kwargs)
     
     def train(self):
+        torch.set_default_tensor_type('torch.cuda.FloatTensor')
+
         kwargs = self.kwargs
 
         from process_tsv import TSVDataset
@@ -160,8 +163,9 @@ class SSDTrain(TorchTrain):
         labelmap = tsv_dataset.get_labelmap_file()
         
         cfg = kwargs
+        from qd_common import load_list_file
         voc = {
-            'num_classes': 21,
+            'num_classes': len(load_list_file(labelmap)) + 1,
             'lr_steps': (80000, 100000, 120000),
             'max_iter': 120000,
             'feature_maps': [38, 19, 10, 5, 3, 1],
@@ -217,7 +221,6 @@ class SSDTrain(TorchTrain):
         conf_loss = 0
         epoch = 0
         logging.info('Loading the dataset...')
-        cfg['batch_size'] = 32
 
         epoch_size = len(dataset) // cfg['batch_size']
 
@@ -275,7 +278,7 @@ class SSDTrain(TorchTrain):
                 'model_iter_{}.pth.tar'.format(iteration + 1))
         torch_save(ssd_net.state_dict(), model_file)
 
-    def predict(self, model_file, predict_result_file):
+    def predict(self, model_file, pred_file):
         train_dataset = TSVDataset(self.data)
         labelmap = train_dataset.load_labelmap()
 
@@ -292,7 +295,6 @@ class SSDTrain(TorchTrain):
         if self.kwargs['cuda']:
             net = net.cuda()
             cudnn.benchmark = True
-        pred_file = self.kwargs['pred_file']
         test_net(pred_file, net, self.kwargs['cuda'], dataset,
                 labelmap, thresh=self.kwargs['confidence_threshold'])
         return pred_file
