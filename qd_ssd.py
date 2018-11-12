@@ -125,7 +125,7 @@ def ssd_pipeline(**kwargs):
     t = SSDTrain(**kwargs)
     t.ensure_train()
     pred_file = t.ensure_predict()
-    t.evaluate(pred_file)
+    t.ensure_evaluate(pred_file)
 
 def detection_collate(batch):
     """Custom collate fn for dealing with batches of images that have a different
